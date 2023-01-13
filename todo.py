@@ -1,9 +1,6 @@
 import sqlite3
-import sys
-import importlib
 import datetime
 import logging
-from pathlib import Path
 
 # Enable for development, will be disabled in "final version"
 # logging.basicConfig(level=logging.DEBUG)
