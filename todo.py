@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.DEBUG)
 todo_database_filename = "todo.db"
 
 # A timestamp for a task that will never be due.
-# (SQL "timestamp" fields must contain a date and time.)
+# (SQL "timestamp" fields MUST contain a date and time.)
 # If no time is provided, datetime will default to midnight (00:00).
 never_due = datetime.datetime(year=9999, month=12, day=31)
 
@@ -72,7 +72,6 @@ def display_tasks(task_list: list):
             print(f"{id}: '{title}', due by {due}")
         else:
             print(f"{id}: '{title}'")
-
 
 def view_tasks(db_connection: sqlite3.Connection):
     """Present a command-line interface for viewing tasks."""
@@ -257,6 +256,45 @@ def add_task(db_connection: sqlite3.Connection):
     
     return
 
+def delete_task(db_connection: sqlite3.Connection):
+    """Delete a task from the database."""
+
+    cursor = db_connection.cursor()
+    tasks = cursor.execute("SELECT * FROM todo").fetchall()
+    
+    if len(tasks) == 0:
+        print("You have no tasks to delete.")
+        return
+    
+    print("The following tasks can be deleted:")
+    display_tasks(tasks)
+
+    task_id = None
+    while task_id == None:
+        try:
+            task_id = int(input("Enter the ID of the task to delete: "))
+        except:
+            print("Sorry, try again.")
+    
+    safety = input(
+        "Are you SURE you want to delete task {task_id}? This CANNOT be undone! (Y/N): "
+    ).lower()
+
+    if safety == 'y':
+        cursor.execute(
+            "DELETE FROM todo WHERE task_id=?",
+            (task_id,)
+        )
+        db_connection.commit()
+        print("The task has been deleted.")
+    elif safety == 'n':
+        print("Cancelled.")
+    else:
+        print("Ambiguous input, cancelled.")
+
+    cursor.close()
+    return
+    
 def main_cli(db_connection: sqlite3.Connection):
     """The main function for the CLI."""
 
@@ -293,6 +331,8 @@ def main_cli(db_connection: sqlite3.Connection):
             You can:
             - VIEW a task
             - ADD a task
+            - DELETE a task
+            - MODIFY a task
             - EXIT from the program
         """)
 
@@ -301,6 +341,8 @@ def main_cli(db_connection: sqlite3.Connection):
             view_tasks(db_connection)
         elif command == 'add':
             add_task(db_connection)
+        elif command == 'delete':
+            delete_task(db_connection)
     
     # User has chosen to exit, so the loop has been exited.
     return
