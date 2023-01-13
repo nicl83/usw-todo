@@ -68,22 +68,88 @@ def display_tasks(task_list: list):
     """        
     for task in task_list:
         id, title, _, due = task
-        print(f"{id}: '{title}', due by {due}")
+        if datetime.datetime.fromisoformat(due) != never_due:
+            print(f"{id}: '{title}', due by {due}")
+        else:
+            print(f"{id}: '{title}'")
+
 
 def view_tasks(db_connection: sqlite3.Connection):
     """Present a command-line interface for viewing tasks."""
 
     cursor = db_connection.cursor()
     tasks = cursor.execute("SELECT * FROM todo").fetchall()
-    cursor.close()
     
     if len(tasks) == 0:
         print("You have no tasks. Why not ADD one?")
         return
-
-    print(f"You have {len(tasks)} tasks to do:")
-    display_tasks(tasks)
     
+    done = False
+    while done == False:
+        print(f"You have {len(tasks)} tasks to do:")
+        display_tasks(tasks)
+        next_command = input(
+            "Would you like to VIEW more info on a task, FILTER the tasks by name, change the SORT of the tasks, or are you DONE?: "
+        ).lower() # case can be discarded
+        if next_command == "view":
+            task_id = None
+            while task_id is None:
+                try:
+                    task_id = int(input("Enter the ID of the task you would like to view: "))
+                except:
+                    print("Sorry, please enter that again.")
+            
+            task = cursor.execute(
+                "SELECT * FROM todo WHERE task_id=?;",
+                (task_id,)
+            ).fetchall()
+
+            if len(task) == 0:
+                print("Hmm, there's no task with that ID. Please try again.")
+            else:
+                id, title, body, due = task[0]
+                print()
+                print(f"Task title: '{title}'")
+                print(f"Task notes: {body}")
+                if datetime.datetime.fromisoformat(due) != never_due:
+                    print(f"This task is due on: {due}")
+                print()
+                
+            
+        elif next_command == "filter":
+            filter_text = input("Please enter the text you would like to filter by (enter nothing to show all tasks): ")
+
+            # Wildcards (%) are added to the string to make it a loose search.
+            # This will match any name that contains the filter_text,
+            # not just names that are exactly filter_text.
+            tasks = cursor.execute(
+                "SELECT * FROM todo WHERE task_title LIKE ?", 
+                (f"%{filter_text}%",)
+            ).fetchall()
+        elif next_command == "sort":
+            sort_type = None
+            
+            valid_sort_types = ("name", "id", "date")
+            while sort_type not in valid_sort_types:
+                sort_type = input("Would you like to sort by ID (default), NAME, or DATE?: ").lower()
+            
+            if sort_type == "id":
+                # Sort by the first element in the task (the ID).
+                tasks.sort(key=lambda x: x[0])
+            elif sort_type == "name":
+                # Sort by the second element in the task (the name).
+                tasks.sort(key=lambda x: x[1])
+            elif sort_type == "date":
+                # Sort by the third element in the task (the date).
+                tasks.sort(
+                    key=lambda x: datetime.datetime.fromisoformat(x[3])
+                )
+
+        elif next_command == "done":
+            # User is done looking at tasks, exit.
+            done = True
+    
+    cursor.close()
     return
 
 def get_datetime_from_user() -> datetime.datetime:
