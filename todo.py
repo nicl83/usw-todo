@@ -5,8 +5,8 @@ import datetime
 import logging
 from pathlib import Path
 
-# Set for development, will be commented in "final version"
-logging.basicConfig(level=logging.DEBUG)
+# Enable for development, will be disabled in "final version"
+# logging.basicConfig(level=logging.DEBUG)
 
 # Filename for the To Do database
 todo_database_filename = "todo.db"
@@ -73,6 +73,20 @@ def display_tasks(task_list: list):
         else:
             print(f"{id}: '{title}'")
 
+def view_task(task: list):
+    """
+    Print a single task to the screen.
+    Only designed for use with a row of the Todo table.
+    Returns nothing.
+    """
+    id, title, body, due = task
+    print()
+    print(f"Task title: '{title}'")
+    print(f"Task notes: {body}")
+    if datetime.datetime.fromisoformat(due) != never_due:
+        print(f"This task is due on: {due}")
+    print()
+
 def view_tasks(db_connection: sqlite3.Connection):
     """Present a command-line interface for viewing tasks."""
 
@@ -106,13 +120,7 @@ def view_tasks(db_connection: sqlite3.Connection):
             if len(task) == 0:
                 print("Hmm, there's no task with that ID. Please try again.")
             else:
-                id, title, body, due = task[0]
-                print()
-                print(f"Task title: '{title}'")
-                print(f"Task notes: {body}")
-                if datetime.datetime.fromisoformat(due) != never_due:
-                    print(f"This task is due on: {due}")
-                print()
+                view_task(task[0])
                 
             
         elif next_command == "filter":
@@ -294,7 +302,61 @@ def delete_task(db_connection: sqlite3.Connection):
 
     cursor.close()
     return
+
+def update_task(db_connection: sqlite3.Connection):
+    """Update a task in the database."""
+
+    cursor = db_connection.cursor()
+    tasks = cursor.execute("SELECT * FROM todo").fetchall()
     
+    if len(tasks) == 0:
+        print("You have no tasks to update.")
+        return
+    
+    print("The following tasks can be updated:")
+    display_tasks(tasks)
+
+    task_id = None
+    while task_id == None:
+        try:
+            task_id = int(input("Enter the ID of the task to modify: "))
+        except:
+            print("Sorry, try again.")
+
+    task = cursor.execute(
+        "SELECT * FROM todo WHERE task_id=?;",
+        (task_id,)
+    ).fetchall()
+
+    if len(task) == 0:
+        print("Hmm, there's no task with that ID. Please try again.")
+    else:
+        # hacky but i have 1hr30 at this point if it works ship it
+        task = list(task[0])
+
+    next_command = None
+    while next_command != 'cancel':
+        view_task(task)
+        next_command = input(
+            "Would you like to change the TITLE, NOTES or DATE, are you DONE, or would you ilke to CANCEL?: "
+        ).lower()
+        if next_command == 'title':
+            task[1] = input("Please enter the new title:")
+        elif next_command == 'notes':
+            task[2] = input("Please enter the new notes:")
+        elif next_command == 'date':
+            task[3] = get_datetime_from_user().isoformat()
+        elif next_command == 'done':
+            cursor.execute(
+                "UPDATE todo SET task_title=?, task_body=?,task_due=? WHERE task_id=?",
+                (task[1], task[2], task[3], task[0])
+            )
+            db_connection.commit()
+            break
+
+    cursor.close()
+    return
+
 def main_cli(db_connection: sqlite3.Connection):
     """The main function for the CLI."""
 
@@ -343,6 +405,8 @@ def main_cli(db_connection: sqlite3.Connection):
             add_task(db_connection)
         elif command == 'delete':
             delete_task(db_connection)
+        elif command == 'modify':
+            update_task(db_connection)
     
     # User has chosen to exit, so the loop has been exited.
     return
@@ -355,13 +419,5 @@ def main_gui(db_connection: sqlite3.Connection):
 
 if __name__ == "__main__":
     db_connection = initialise_db(todo_database_filename)
-
-    # Try to launch in graphical mode.
-    # If this fails, fallback to a command-line interface.
-    try:
-        # this doesn't exist yet, but will be seperated into a package
-        # import usw_todo_gui
-        logging.debug("The GUI is stubbed, the CLI will be called instead")
-        main_cli(db_connection)
-    except ModuleNotFoundError:
-        main_cli(db_connection)
+    main_cli(db_connection)
+    db_connection.close()
