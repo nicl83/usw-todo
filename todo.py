@@ -52,7 +52,23 @@ def initialise_db(filename: str) -> sqlite3.Connection:
         logging.debug("Found Todo table!")
 
     #...eventually
+    db_cursor.close()
     return db_connection
+
+def display_tasks(task_list: list):
+    """
+    Print a list of tasks to the screen.
+    
+    WARNING! This is NOT view_tasks.
+    This is designed to use the result of a SELECT from the Todo table
+    to print the list of tasks in a nice way for the user.
+    Passing arbitrary lists to this function will cause undefined behaviour!
+    This code will be used multiple times, so it has been broken out into a 
+    separate function.
+    """        
+    for task in task_list:
+        id, title, _, due = task
+        print(f"{id}: '{title}', due by {due}")
 
 def view_tasks(db_connection: sqlite3.Connection):
     """Present a command-line interface for viewing tasks."""
@@ -61,8 +77,12 @@ def view_tasks(db_connection: sqlite3.Connection):
     tasks = cursor.execute("SELECT * FROM todo").fetchall()
     cursor.close()
     
-    # TODO pretty printing
-    print(tasks)
+    if len(tasks) == 0:
+        print("You have no tasks. Why not ADD one?")
+        return
+
+    print(f"You have {len(tasks)} tasks to do:")
+    display_tasks(tasks)
     
     return
 
@@ -191,11 +211,11 @@ def main_cli(db_connection: sqlite3.Connection):
         (tomorrow.isoformat(),)
     )
     tasks_due_soon = cursor.fetchall()
+    cursor.close()
+
     if len(tasks_due_soon) > 0:
         print("IMPORTANT: You have tasks due soon.")
-        for task in tasks_due_soon:
-            id, title, _, due = task
-            print(f"{id}: '{title}', due at {due}")
+        display_tasks(tasks_due_soon)
 
     # Define valid commands for the CLI.
     valid_commands = ('view', 'add', 'exit')
