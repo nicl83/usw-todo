@@ -156,7 +156,7 @@ def add_task(db_connection: sqlite3.Connection):
                     task_due_date = get_datetime_from_user()
                 elif add_due_date == 'n':
                     task_due_date = never_due
-                    
+
         elif change_command == 'ok':
             # User is OK with the task, end the loop and add it to the database
             task_ok = True
@@ -165,11 +165,60 @@ def add_task(db_connection: sqlite3.Connection):
     cursor.execute(
         "INSERT INTO todo (task_title, task_body, task_due) VALUES (?, ?, ?)",
         (task_name, task_body, task_due_date)
-    )           
+    )
+    db_connection.commit()
+    cursor.close()
+    
+    return
 
 def main_cli(db_connection: sqlite3.Connection):
     """The main function for the CLI."""
-    pass
+
+    # Check to see if the user has any tasks due soon that they should be
+    # reminded of.
+    tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+    logging.debug(f"tomorrow is {tomorrow.isoformat()}")
+    logging.debug(f"hunch: {len(str(tomorrow))}")
+
+    cursor = db_connection.cursor()
+
+    # There is a comma after the "isoformat" function to explicitly designate
+    # everything between the brackets as a tuple. Without it, the SQLite module
+    # attempts to interpret the string as a list of characters, and the code
+    # does not work. (I am not a fan of this but understand the logic)
+    cursor.execute(
+        "SELECT * FROM todo WHERE task_due <= ?;",
+        (tomorrow.isoformat(),)
+    )
+    tasks_due_soon = cursor.fetchall()
+    if len(tasks_due_soon) > 0:
+        print("IMPORTANT: You have tasks due soon.")
+        for task in tasks_due_soon:
+            id, title, _, due = task
+            print(f"{id}: '{title}', due at {due}")
+
+    # Define valid commands for the CLI.
+    valid_commands = ('view', 'add', 'exit')
+    command = None
+    while command != 'exit':
+        # Print possible commands and ask what the user would like to do
+        print("""
+            USW To-Do
+            You can:
+            - VIEW a task
+            - ADD a task
+            - EXIT from the program
+        """)
+
+        command = input("Enter a command: ").lower()
+        if command == 'view':
+            view_tasks(db_connection)
+        elif command == 'add':
+            add_task(db_connection)
+    
+    # User has chosen to exit, so the loop has been exited.
+    return
+
 
 def main_gui(db_connection: sqlite3.Connection):
     """The main function for the Tk-based GUI."""
